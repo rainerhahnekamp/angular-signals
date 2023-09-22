@@ -16,6 +16,12 @@ export interface WritableSignal<T> extends Signal<T> {
   update(updateFn: (value: T) => T): void;
 }
 
+function producerAccessed<T>(node: ReactiveNode<T>) {
+  if (activeConsumer && !node.consumers.includes(activeConsumer)) {
+    node.consumers.push(activeConsumer);
+  }
+}
+
 export function signal<T>(initialValue: T): WritableSignal<T> {
   const node: ReactiveNode<T> = {
     consumers: [],
@@ -24,9 +30,7 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   };
 
   function signalFn() {
-    if (activeConsumer && !node.consumers.includes(activeConsumer)) {
-      node.consumers.push(activeConsumer);
-    }
+    producerAccessed(node);
     return node.value;
   }
   signalFn.set = (newValue: T) => {
@@ -56,10 +60,12 @@ export function computed<T>(computation: () => T): Signal<T> {
     value: UNSET,
     producerHasChanged: () => {
       node.value = node.computation();
+      producerNotifyConsumers(node);
     },
   };
 
   function computed() {
+    producerAccessed(node);
     let prevConsumer = activeConsumer;
     activeConsumer = node;
     if (node.value === UNSET) {

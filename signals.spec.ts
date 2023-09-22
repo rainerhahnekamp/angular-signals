@@ -40,5 +40,16 @@ describe("Signals", () => {
     });
   });
 
-  test.skip("computed should be a producer as well");
+  test("computed should be a producer as well", () => {
+    const person = signal({ firstname: "Jessica", name: "Smith" });
+    const prettyName = computed(() => {
+      return `${person().firstname} ${person().name}`;
+    });
+
+    const prettyNameLog = computed(() => `Signals - INFO - ${prettyName()}`);
+
+    expect(prettyNameLog()).toBe("Signals - INFO - Jessica Smith");
+    person.update((value) => ({ ...value, name: "Johnson" }));
+    expect(prettyNameLog()).toBe("Signals - INFO - Jessica Johnson");
+  });
 });
