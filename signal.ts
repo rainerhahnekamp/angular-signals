@@ -1,8 +1,8 @@
 export interface ReactiveNode<T> {
   computation?(): T;
   consumers: ReactiveNode<unknown>[];
-  producerHasChanged: () => void;
   value: T;
+  dirty: boolean;
 }
 
 let activeConsumer: ReactiveNode<unknown> | undefined;
@@ -26,7 +26,7 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   const node: ReactiveNode<T> = {
     consumers: [],
     value: initialValue,
-    producerHasChanged: () => {},
+    dirty: false,
   };
 
   function signalFn() {
@@ -45,9 +45,14 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   return signalFn;
 }
 
+function consumerMarkDirty(node: ReactiveNode<unknown>) {
+  node.dirty = true;
+  producerNotifyConsumers(node);
+}
+
 function producerNotifyConsumers(node: ReactiveNode<unknown>) {
   for (const consumer of node.consumers) {
-    consumer.producerHasChanged();
+    consumerMarkDirty(consumer);
   }
 }
 
@@ -58,18 +63,17 @@ export function computed<T>(computation: () => T): Signal<T> {
     computation,
     consumers: [],
     value: UNSET,
-    producerHasChanged: () => {
-      node.value = node.computation();
-      producerNotifyConsumers(node);
-    },
+    dirty: false,
   };
 
   function computed() {
     producerAccessed(node);
     let prevConsumer = activeConsumer;
     activeConsumer = node;
-    if (node.value === UNSET) {
+    if (node.value === UNSET || node.dirty) {
       node.value = node.computation();
+      producerNotifyConsumers(node);
+      node.dirty = false;
     }
 
     activeConsumer = prevConsumer;
@@ -78,4 +82,17 @@ export function computed<T>(computation: () => T): Signal<T> {
   }
 
   return computed as Signal<T>;
+}
+export function effect<T>(effectFn: () => T) {
+  const node: ReactiveNode<T | typeof UNSET> = {
+    computation: effectFn,
+    consumers: [],
+    value: UNSET,
+    dirty: false,
+  };
+
+  let prevConsumer = activeConsumer;
+  activeConsumer = node;
+  node.computation();
+  activeConsumer = prevConsumer;
 }

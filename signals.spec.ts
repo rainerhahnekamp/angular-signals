@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "vitest";
-import { computed, signal } from "./signal";
+import { computed, effect, signal } from "./signal";
 
 describe("Signals", () => {
   it("should create a signal", () => {
@@ -51,5 +51,21 @@ describe("Signals", () => {
     expect(prettyNameLog()).toBe("Signals - INFO - Jessica Smith");
     person.update((value) => ({ ...value, name: "Johnson" }));
     expect(prettyNameLog()).toBe("Signals - INFO - Jessica Johnson");
+  });
+
+  it("should be glitch-free", () => {
+    let prettyNameCount = 0;
+    const person = signal({ firstname: "Jessica", name: "Smith" });
+    const log = computed(() => {
+      prettyNameCount++;
+      // renderDOM();
+      console.log(`${person().firstname} ${person().name}`);
+    });
+    log();
+
+    person.update((value) => ({ ...value, name: "Johnson" }));
+    person.update((value) => ({ ...value, firstname: "Anna" }));
+
+    expect(prettyNameCount).toBe(1);
   });
 });
