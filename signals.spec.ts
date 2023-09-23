@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "vitest";
-import { computed, effect, signal } from "./signal";
+import { computed, signal } from "./signal";
 
 describe("Signals", () => {
   it("should create a signal", () => {
@@ -67,5 +67,25 @@ describe("Signals", () => {
     person.update((value) => ({ ...value, firstname: "Anna" }));
 
     expect(prettyNameCount).toBe(1);
+  });
+
+  it("should support dynamic dependencies", () => {
+    let computedRunCount = 0;
+    const lunch = signal({ name: "Schnitzel", price: 10.5 });
+    const dinner = signal({ name: "Jause", price: 3.9 });
+    const isEvening = signal(true);
+
+    const menu = computed(() => {
+      computedRunCount++;
+      const meal = isEvening() ? dinner() : lunch();
+      return `Dinner: ${meal.name}: ${meal.price.toFixed(2)}`;
+    });
+
+    menu();
+    isEvening.update(() => false);
+    menu();
+    dinner.update((value) => ({ ...value, price: 4.5 }));
+    menu();
+    expect(computedRunCount).toBe(2);
   });
 });
