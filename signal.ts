@@ -26,7 +26,7 @@ function createReactiveNode<T>(
     ...defaultNode,
     value,
     ...node,
-  } as ReactiveNode<unknown>;
+  } as ReactiveNode<T>;
 }
 
 let activeConsumer: ReactiveNode<unknown> | undefined;
