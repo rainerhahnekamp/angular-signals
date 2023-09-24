@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signal } from "./signal";
+import { computed, signal } from "./signal";
 
 type Meal = {
   name: string;
@@ -17,5 +17,33 @@ describe("Signals", () => {
 
     lunch.update((value) => ({ ...value, price: 8 }));
     expect(lunch()).toEqual({ name: "Jause", price: 8 });
+  });
+
+  describe("computed", () => {
+    it("should produce a derived value", () => {
+      const lunch = signal<Meal>({ name: "Schnitzel", price: 10.5 });
+      const prettyName = computed(
+        () => `${lunch().name}: EUR ${lunch().price.toFixed(2)}`,
+      );
+
+      expect(prettyName()).toBe("Schnitzel: EUR 10.50");
+
+      lunch.update((value) => ({ ...value, price: 12 }));
+      expect(prettyName()).toBe("Schnitzel: EUR 12.00");
+    });
+
+    describe("computed", () => {
+      it("should be reactive", () => {
+        const lunch = signal<Meal>({ name: "Schnitzel", price: 10.5 });
+        const prettyName = computed(() => {
+          return `${lunch().name}: EUR ${lunch().price.toFixed(2)}`;
+        });
+
+        expect(prettyName()).toBe("Schnitzel: EUR 10.50");
+
+        lunch.update((value) => ({ ...value, price: 12 }));
+        expect(prettyName()).toBe("Schnitzel: EUR 12.00");
+      });
+    });
   });
 });
