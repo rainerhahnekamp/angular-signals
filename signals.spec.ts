@@ -1,6 +1,12 @@
 import { describe, expect, it, test } from "vitest";
 import { computed, signal } from "./signal";
 
+type Meal = {
+  name: string;
+  price: number;
+  amount: number;
+};
+
 describe("Signals", () => {
   it("should create a signal", () => {
     const city = signal("New York");
@@ -87,5 +93,26 @@ describe("Signals", () => {
     dinner.update((value) => ({ ...value, price: 4.5 }));
     menu();
     expect(computedRunCount).toBe(2);
+  });
+
+  it("should not recompute on if producer values are equal", () => {
+    let computedRunCount = 0;
+    const isMealEqual = (meal1: Meal, meal2: Meal) =>
+      meal1.price === meal2.price && meal1.name === meal2.name;
+    const lunch = signal(
+      { name: "Schnitzel", price: 10.5, amount: 2 },
+      { equal: isMealEqual },
+    );
+
+    const isExpensive = computed(() => {
+      computedRunCount++;
+      const meal = lunch();
+      return meal.price * meal.amount > 20;
+    });
+
+    isExpensive();
+    lunch.update((value) => ({ ...value }));
+    isExpensive();
+    expect(computedRunCount).toBe(1);
   });
 });

@@ -1,12 +1,22 @@
+export type CreateOptions<T> = {
+  equal: (value1: T, value2: T) => boolean;
+};
+
+const defaultEqual = (value1, value2) => value1 === value2;
+
 export interface ReactiveNode<T> {
   computation?(): T;
   consumers: ReactiveNode<unknown>[];
   consumerIndexOfThis: number[];
   value: T;
   dirty: boolean;
+  version: number;
   nextProducerIndex: number;
   producerNode: ReactiveNode<unknown>[];
   producerIndexOfThis: number[];
+  producerVersions: number[];
+  equal: (value1: T, value2: T) => boolean;
+  producerRecomputeValue: () => void;
 }
 
 function createReactiveNode<T>(
@@ -17,9 +27,13 @@ function createReactiveNode<T>(
     consumers: [],
     consumerIndexOfThis: [],
     dirty: false,
+    version: 0,
     nextProducerIndex: 0,
     producerNode: [],
     producerIndexOfThis: [],
+    producerRecomputeValue: () => {},
+    producerVersions: [],
+    equal: (value1, value2) => value1 === value2,
   };
 
   return {
@@ -47,9 +61,6 @@ function producerRemoveConsumer(
   const lastIdx = staleProducer.consumers.length - 1;
   staleProducer.consumers[idx] = staleProducer.consumers[lastIdx];
   staleProducer.consumers.length--;
-
-  if (idx < staleProducer.consumers.length) {
-  }
 }
 
 function producerAccessed<T>(node: ReactiveNode<T>) {
@@ -78,21 +89,37 @@ function producerAccessed<T>(node: ReactiveNode<T>) {
     node.consumerIndexOfThis.push(idx);
     activeConsumer.producerIndexOfThis[idx] = node.consumers.length - 1;
   }
+  activeConsumer.producerVersions[idx] = node.version;
 }
 
-export function signal<T>(initialValue: T): WritableSignal<T> {
-  const node: ReactiveNode<T> = createReactiveNode(initialValue);
+export function signal<T>(
+  initialValue: T,
+  options: CreateOptions<T> = { equal: defaultEqual },
+): WritableSignal<T> {
+  const node: ReactiveNode<T> = createReactiveNode(initialValue, {
+    equal: options.equal,
+  });
 
   function signalFn() {
     producerAccessed(node);
     return node.value;
   }
   signalFn.set = (newValue: T) => {
+    if (options.equal(newValue, node.value)) {
+      return;
+    }
     node.value = newValue;
+    node.version++;
     producerNotifyConsumers(node);
   };
   signalFn.update = (cb: (value: T) => T) => {
-    node.value = cb(node.value);
+    const newValue = cb(node.value);
+    if (options.equal(newValue, node.value)) {
+      return;
+    }
+
+    node.value = newValue;
+    node.version++;
     producerNotifyConsumers(node);
   };
 
@@ -123,20 +150,63 @@ function consumerAfterComputation(prevConsumer: ReactiveNode<unknown>) {
   activeConsumer = prevConsumer;
 }
 
-export function computed<T>(computation: () => T): Signal<T> {
+function consumerPollProducersForChange<T>(node: ReactiveNode<T>): boolean {
+  for (let i = 0; i < node.producerNode.length; i++) {
+    const producer = node.producerNode[i];
+    const seenVersion = node.producerVersions[i];
+    if (seenVersion !== producer.version) {
+      return true;
+    }
+
+    producer.producerRecomputeValue();
+    if (seenVersion !== producer.version) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function producerUpdateValueVersion<T>(node: ReactiveNode<T>) {
+  if (!node.dirty) {
+    return;
+  }
+
+  if (node.value !== UNSET && !consumerPollProducersForChange(node)) {
+    node.dirty = false;
+    return true;
+  }
+  node.producerRecomputeValue();
+  node.dirty = false;
+}
+
+export function computed<T>(
+  computation: () => T,
+  options: CreateOptions<T> = { equal: defaultEqual },
+): Signal<T> {
   const node: ReactiveNode<T | typeof UNSET> = createReactiveNode(UNSET, {
     computation,
+    dirty: true,
+    equal: options.equal,
+    producerRecomputeValue: () => {
+      let prevConsumer = consumerBeforeComputation(node);
+      if (node.value === UNSET || node.dirty) {
+        for (const producer of node.producerNode) {
+          producer.producerRecomputeValue();
+        }
+        const newValue = node.computation();
+        if (!node.equal(newValue, node.value)) {
+          node.value = newValue;
+          node.version++;
+        }
+      }
+      consumerAfterComputation(prevConsumer);
+    },
   });
 
   function computed() {
+    producerUpdateValueVersion(node);
     producerAccessed(node);
-    let prevConsumer = consumerBeforeComputation(node);
-    if (node.value === UNSET || node.dirty) {
-      node.value = node.computation();
-      producerNotifyConsumers(node);
-      node.dirty = false;
-    }
-    consumerAfterComputation(prevConsumer);
 
     return node.value;
   }
