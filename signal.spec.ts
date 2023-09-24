@@ -4,6 +4,7 @@ import { computed, signal } from "./signal";
 type Meal = {
   name: string;
   price: number;
+  amount?: number;
 };
 
 describe("Signals", () => {
@@ -51,6 +52,19 @@ describe("Signals", () => {
       lunch.update((value) => ({ ...value, price: 12 }));
       prettyName();
       expect(computedCount).toBe(2);
+    });
+
+    it("should be a producer as well", () => {
+      const lunch = signal<Meal>({ name: "Schnitzel", price: 10.5, amount: 2 });
+      const total = computed(() => lunch().amount * lunch().price);
+      const isExpensive = computed(() => total() > 25);
+
+      expect(isExpensive()).toBe(false);
+
+      lunch.update((value) => {
+        return { ...value, amount: 3 };
+      });
+      expect(isExpensive()).toBe(true);
     });
   });
 });

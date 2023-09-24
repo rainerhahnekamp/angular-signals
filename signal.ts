@@ -80,6 +80,7 @@ export function computed<T>(computation: () => T): Signal<T> {
   const node = createReactiveNode<T>(UNSET, {
     onValueChange: () => {
       node.value = computation();
+      producerNotifyConsumer(node);
     },
   });
 
@@ -89,6 +90,8 @@ export function computed<T>(computation: () => T): Signal<T> {
       node.onValueChange();
     }
     consumerAfterComputation(prevConsumer);
+
+    producerAccessed(node);
     return node.value;
   }
 
