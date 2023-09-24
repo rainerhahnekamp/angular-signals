@@ -31,5 +31,26 @@ describe("Signals", () => {
       lunch.update((value) => ({ ...value, price: 12 }));
       expect(prettyName()).toBe("Schnitzel: EUR 12.00");
     });
+
+    it("should be reactive", () => {
+      let computedCount = 0;
+      const lunch = signal<Meal>({ name: "Schnitzel", price: 10.5 });
+      const prettyName = computed(() => {
+        computedCount++;
+        return `${lunch().name}: EUR ${lunch().price.toFixed(2)}`;
+      });
+
+      expect(computedCount).toBe(0);
+
+      prettyName();
+      expect(computedCount).toBe(1);
+
+      prettyName();
+      expect(computedCount).toBe(1);
+
+      lunch.update((value) => ({ ...value, price: 12 }));
+      prettyName();
+      expect(computedCount).toBe(2);
+    });
   });
 });
