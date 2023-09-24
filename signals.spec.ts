@@ -21,7 +21,7 @@ describe("Signals", () => {
     });
   });
 
-  describe("computed", () => {
+  describe("basics", () => {
     test("computed should produce a derived value", () => {
       const person = signal({ firstname: "Jessica", name: "Smith" });
       const prettyName = computed(
@@ -44,35 +44,33 @@ describe("Signals", () => {
 
       expect(computedCount).toBe(2);
     });
-  });
+    it("should be a producer as well", () => {
+      const person = signal({ firstname: "Jessica", name: "Smith" });
+      const prettyName = computed(() => {
+        return `${person().firstname} ${person().name}`;
+      });
 
-  test("computed should be a producer as well", () => {
-    const person = signal({ firstname: "Jessica", name: "Smith" });
-    const prettyName = computed(() => {
-      return `${person().firstname} ${person().name}`;
+      const prettyNameLog = computed(() => `Signals - INFO - ${prettyName()}`);
+
+      expect(prettyNameLog()).toBe("Signals - INFO - Jessica Smith");
+      person.update((value) => ({ ...value, name: "Johnson" }));
+      expect(prettyNameLog()).toBe("Signals - INFO - Jessica Johnson");
     });
+    it("should be glitch-free", () => {
+      let prettyNameCount = 0;
+      const person = signal({ firstname: "Jessica", name: "Smith" });
+      const log = computed(() => {
+        prettyNameCount++;
+        // renderDOM();
+        console.log(`${person().firstname} ${person().name}`);
+      });
+      log();
 
-    const prettyNameLog = computed(() => `Signals - INFO - ${prettyName()}`);
+      person.update((value) => ({ ...value, name: "Johnson" }));
+      person.update((value) => ({ ...value, firstname: "Anna" }));
 
-    expect(prettyNameLog()).toBe("Signals - INFO - Jessica Smith");
-    person.update((value) => ({ ...value, name: "Johnson" }));
-    expect(prettyNameLog()).toBe("Signals - INFO - Jessica Johnson");
-  });
-
-  it("should be glitch-free", () => {
-    let prettyNameCount = 0;
-    const person = signal({ firstname: "Jessica", name: "Smith" });
-    const log = computed(() => {
-      prettyNameCount++;
-      // renderDOM();
-      console.log(`${person().firstname} ${person().name}`);
+      expect(prettyNameCount).toBe(1);
     });
-    log();
-
-    person.update((value) => ({ ...value, name: "Johnson" }));
-    person.update((value) => ({ ...value, firstname: "Anna" }));
-
-    expect(prettyNameCount).toBe(1);
   });
 
   it("should support dynamic dependencies", () => {
@@ -95,7 +93,7 @@ describe("Signals", () => {
     expect(computedRunCount).toBe(2);
   });
 
-  it("should not recompute on if producer values are equal", () => {
+  it("should support value versions", () => {
     let computedRunCount = 0;
     const isMealEqual = (meal1: Meal, meal2: Meal) =>
       meal1.price === meal2.price && meal1.name === meal2.name;
