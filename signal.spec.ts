@@ -66,5 +66,25 @@ describe("Signals", () => {
       });
       expect(isExpensive()).toBe(true);
     });
+
+    it("should be glitch-free", () => {
+      let computedCount = 0;
+      const lunch = signal<Meal>({ name: "Schnitzel", price: 10.5, amount: 2 });
+      const total = computed(() => {
+        computedCount++;
+        // some heavy computation...
+        return lunch().amount * lunch().price;
+      });
+
+      total();
+      expect(computedCount).toBe(1);
+
+      lunch.update((value) => ({ ...value, amount: 3 }));
+      lunch.update((value) => ({ ...value, amount: 1 }));
+      expect(computedCount).toBe(1);
+
+      total();
+      expect(computedCount).toBe(2);
+    });
   });
 });

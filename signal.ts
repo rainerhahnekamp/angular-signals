@@ -8,7 +8,7 @@ export interface WritableSignal<T> extends Signal<T> {
 type ReactiveNode<T> = {
   value: T;
   consumers: ReactiveNode<unknown>[];
-  onValueChange: () => void;
+  dirty: boolean;
 };
 
 const UNSET = Symbol();
@@ -19,7 +19,7 @@ function createReactiveNode<T>(
 ): ReactiveNode<T> {
   const defaultNode: Omit<ReactiveNode<T>, "value"> = {
     consumers: [],
-    onValueChange: () => {},
+    dirty: false,
   };
 
   return { ...defaultNode, value, ...properties } as ReactiveNode<T>;
@@ -41,7 +41,8 @@ function producerAccessed<T>(node: ReactiveNode<T>) {
 
 function producerNotifyConsumer(node: ReactiveNode<unknown>) {
   for (const consumer of node.consumers) {
-    consumer.onValueChange();
+    consumer.dirty = true;
+    producerNotifyConsumer(consumer);
   }
 }
 
@@ -77,17 +78,13 @@ function consumerAfterComputation(prevConsumer: ReactiveNode<unknown>) {
 }
 
 export function computed<T>(computation: () => T): Signal<T> {
-  const node = createReactiveNode<T>(UNSET, {
-    onValueChange: () => {
-      node.value = computation();
-      producerNotifyConsumer(node);
-    },
-  });
+  const node = createReactiveNode<T>(UNSET, {});
 
   function computed() {
     const prevConsumer = consumerBeforeComputation(node);
-    if (node.value === UNSET) {
-      node.onValueChange();
+    if (node.value === UNSET || node.dirty) {
+      node.value = computation();
+      node.dirty = false;
     }
     consumerAfterComputation(prevConsumer);
 
